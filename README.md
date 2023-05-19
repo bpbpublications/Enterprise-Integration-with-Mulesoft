@@ -1,2 +1,2 @@
-# Mulesoft Ready Reckoner
- Mulesoft Ready Reckoner, by BPB Publications
+# Enterprise Integration with Mulesoft
+ Enterprise Integration with Mulesoft, by BPB Publications
