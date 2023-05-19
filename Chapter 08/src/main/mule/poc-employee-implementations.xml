@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<validation:config name="Validation_Config1" doc:name="Validation Config" doc:id="432f1cf8-494c-4eef-8e5e-84dcd445ab4b"/>
+	<flow name="updateEmployee" doc:id="fbb88eb2-d545-4dd2-a421-350c1405a8bf" >
+		<logger level="INFO" doc:name="Logger" doc:id="c3bc053f-1880-40b9-a91d-a12f6c2b85ea" message="Add or update the employee"/>
+		<ee:transform doc:name="Transform Message" doc:id="0f6dd253-3c33-4490-9e67-38e948cc9066" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<validation:is-true doc:name="Is true" doc:id="4f7fcf3b-f826-44a0-97dc-692b34b6fbc4" config-ref="Validation_Config1" message="email__c, ename__c, designation__c or salary__c can not be null or blank" expression='#[!((payload map (o,i) -&gt; (o.email__c != null and o.salary__c != null and o.ename__c != null and o.designation__c != null and o.designation__c != "" and o.email__c != "" and o.ename__c !="" and o.salary__c != "")) contains (false))]'/>
+		<salesforce:upsert doc:name="Upsert" doc:id="f35a1931-441c-45ab-a6fc-366e04699a44" config-ref="SFDCDemoConnection" objectType="pocemployee__c" externalIdFieldName="email__c"/>
+		<ee:transform doc:name="Transform Message" doc:id="88903d2f-e542-4af1-8c47-6c4a09307ca1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="bf884046-7d26-45aa-ba65-abea89f8b2d2" message="End of add or update employee"/>
+<error-handler ><on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="8e0bea60-dc4d-4662-a776-5b895d5c578f" type="ANY">
+				<ee:transform doc:name="Error Message" doc:id="f3c5d15f-c500-4560-a401-f6d66808317d" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	status: "Failure",
+	errorMessage: error.description
+
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="getAllEmployees" doc:id="892a96ea-1c48-4f92-a897-001e530bb0fc" >
+		<logger level="INFO" doc:name="Logger" doc:id="2ddf7e3d-1868-490c-b14c-df2747388981" message="Get all Employees details from SFDC"/>
+		<salesforce:query doc:name="Query" doc:id="096c3a9c-45b9-4c12-9a75-d4bd90240947" config-ref="SFDCDemoConnection">
+			<salesforce:salesforce-query ><![CDATA[select Name,ename__c,designation__c,salary__c,email__c from pocemployee__c]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="9e1fbc17-8f5a-4f86-abd4-c643a3cfa4ec" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+if(payload == null or sizeOf(payload)== 0 ) "No employee found by given Id"
+else (payload map (emp,index) -> {
+	'empId': emp.Name,
+	'ename__c' : emp.ename__c,
+	'designation__c' : emp.designation__c,
+	'email__c': emp.email__c,
+	'salary__c': emp.salary__c
+})]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="0d16dae4-3df8-4399-a9ed-d7f1c3bb5cea" message="End of get All employees"/>
+	<error-handler ><on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="4cb55d88-049b-415d-aaa8-2ce6c8c68b8b" type="ANY">
+				<ee:transform doc:name="Error Message" doc:id="02f4d9ad-d800-4e72-aed5-803033ad34ad" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	status: "Failure",
+	errorMessage: error.description
+
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="getEmployeeById" doc:id="37481d9c-47c6-4413-8488-c6864960426a" >
+		<logger level="INFO" doc:name="Logger" doc:id="1b1ae8d2-901e-4b80-90d3-6652ce9f7d2e" message="Get employee details of #[attributes.uriParams.'id']"/>
+		<salesforce:query doc:name="Query" doc:id="1f5e358e-7416-47bf-bbfb-4a9772e4024f" config-ref="SFDCDemoConnection">
+			<salesforce:salesforce-query ><![CDATA[select Name,ename__c,designation__c,salary__c,email__c from pocemployee__c where Name = ':empId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"empId" : attributes.uriParams.'id'
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="75a1d560-9745-4091-bf28-8f7141b03a4c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+if(payload == null or sizeOf(payload)== 0 ) "No employee found by given Id"
+else (payload map (emp,index) -> {
+	'empId': emp.Name,
+	'ename__c' : emp.ename__c,
+	'designation__c' : emp.designation__c,
+	'email__c': emp.email__c,
+	'salary__c': emp.salary__c
+})]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="66501144-bddc-4219-8aea-4987962f7667" message="End of get employee by id #[payload]"/>
+<error-handler ><on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="56fab614-8bfc-4834-b4d1-eae452ef6de8" type="ANY">
+				<ee:transform doc:name="Error Message" doc:id="9a0be8a9-3160-4fe4-ab2b-5f0a07c26605" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	status: "Failure",
+	errorMessage: error.description
+
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="deleteEmployee" doc:id="003d4dbd-dc00-4b98-b15a-8af6f55676d8" >
+<logger level="INFO" doc:name="Logger" doc:id="891c3f69-eb90-4f64-939e-0a9736884c32" message="Delete employee from SFDC"/>
+		<salesforce:query doc:name="Query" doc:id="e8a8c374-d6db-4dca-baad-e0c8a223ccd6" config-ref="SFDCDemoConnection">
+			<salesforce:salesforce-query ><![CDATA[select ename__c,email__c,Id from pocemployee__c where Name = ':empId']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"empId" : attributes.uriParams.'empId'
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<logger level="INFO" doc:name="Logger" doc:id="55c24277-7e1e-4313-9433-42853f50375f" message="employee exists with email #[payload.email__c]"/>
+		<salesforce:delete doc:name="Delete" doc:id="35b0aa93-0001-46b6-8019-3a3f33925f82" config-ref="SFDCDemoConnection">
+			<salesforce:ids ><![CDATA[#[payload.Id]]]></salesforce:ids>
+		</salesforce:delete>
+		<ee:transform doc:name="Transform Message" doc:id="a983ca24-8543-40d1-a4bf-684f9fb3ca24" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="94fbc707-1439-426c-9189-0f028e52ff6c" message="End of delete employee by id"/>
+		<error-handler ><on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="d88096e1-8af6-4c1c-b135-8ef7151487bf" type="ANY">
+				<ee:transform doc:name="Error Message" doc:id="6f57b688-5205-4ce4-8a8e-d8711ff89870" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	status: "Failure",
+	errorMessage: error.description
+
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>

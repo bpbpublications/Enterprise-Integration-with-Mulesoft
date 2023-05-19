@@ -1,0 +1,12 @@
+fetch('https://restcountries.com/v3.1/name/India?fullText=true#name', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: 'India'
+  })
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error(error))

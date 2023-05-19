@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+	<flow name="addEmployee" doc:id="4775efb3-dc68-4426-88f9-232482f14749" >
+		<logger level="INFO" doc:name="Logger" doc:id="0c4bb19d-7ce1-44e6-a3fe-8eeaa623df95" message="Add or update the employee"/>
+		<ee:transform doc:name="StoreinputPayload" doc:id="d42958be-c8ce-40b9-8027-f2f4d9b2f4dd" >
+		
+			<ee:variables >
+				<ee:set-variable variableName="inputPayload" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		
+</ee:transform>
+		<try doc:name="Try" doc:id="c43a1063-ff64-406e-883f-23ea7f9ee933" >
+			<ee:transform doc:name="MandatoryFieldFilter" doc:id="714da049-7255-432e-86f3-e3c0b7ab8697">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="mandFieldCheck"><![CDATA[%dw 2.0
+output application/json
+---
+vars.inputPayload map (o,i) -> o ++ { 
+    "isMandatoryFieldMissing": (o.email__c != null and o.salary__c != null and o.ename__c != null and o.designation__c != null and o.designation__c != "" and o.email__c != "" and o.ename__c !="" and o.salary__c != "")}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+			<validation:is-true doc:name="Is true" doc:id="c1d14ecc-30bf-4892-be1f-4b20de69c17a" config-ref="Validation_Config1" message="email__c, ename__c, designation__c or salary__c can not be null or blank" expression="#[!(vars.mandFieldCheck != null and sizeOf(vars.mandFieldCheck filter ($.isMandatoryFieldMissing == false)) &gt; 0)]" />
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="f4e8622a-d015-4262-bbdf-c19fb82f15f7" type="VALIDATION:INVALID_BOOLEAN">
+				<ee:transform doc:name="Removing the invalid emp from payload" doc:id="6dede41a-7998-416b-a844-5a7f09d087af">
+					<ee:message>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="inputPayload"><![CDATA[%dw 2.0
+output application/json
+---
+vars.inputPayload -- flatten(vars.mandFieldCheck map (o,i) ->  vars.inputPayload filter($.email__c== o.email__c and o."isMandatoryFieldMissing" == false))]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-continue>
+			</error-handler>
+		</try>
+		<try doc:name="Try" doc:id="f8f8652a-a184-4821-a72f-f26923262280" >
+			<ee:transform doc:name="Transform Message" doc:id="273b54c2-90e0-4235-93df-86b86902c20b" >
+			
+				<ee:variables >
+					<ee:set-variable variableName="searchEmpRes" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<foreach doc:name="For Each" doc:id="4d047e55-0914-4248-a3ab-9e76e49b990b" collection="#[vars.inputPayload]">
+				<salesforce:query doc:name="Query" doc:id="f8c7c248-e665-43a2-a1b8-4c3509afc598" config-ref="SFDCDemoConnection">
+				<salesforce:salesforce-query><![CDATA[select Name,ename__c,designation__c,salary__c,email__c from pocemployee__c where email__c = ':email']]></salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"email" : payload.email__c
+}]]]></salesforce:parameters>
+			</salesforce:query>
+				<ee:transform doc:name="Transform Message" doc:id="9c1e38b2-3a3e-406b-ad8c-716a3b027903" >
+					<ee:message >
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="searchEmpRes" ><![CDATA[%dw 2.0
+output application/json
+---
+if(payload == null or sizeOf(payload)== 0 ) 
+payload
+else [{"email__c" : vars.inputPayload.email__c,
+	"reason" : "emp not added employee already exists",
+	"status" : "failure"
+}]]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</foreach>
+			<choice doc:name="Choice" doc:id="7402afde-50db-49db-b60f-94cbc3ab8507" >
+				<when expression='#[vars.searchEmpRes != null and sizeOf(vars.searchEmpRes)&gt;0 and sizeOf((vars.searchEmpRes filter ($.status == "failure"))) &gt; 0]'>
+					<raise-error doc:name="Raise error" doc:id="247bf1b0-c70c-4769-9d5a-ef2788fff4ec" type="EMP:EXISTS" description="Employee exists"/>
+				</when>
+				<otherwise >
+					<logger level="INFO" doc:name="Logger" doc:id="57907c77-0069-4ec2-b8b3-38ff7b6b5168" message="No Emp previously existed on SFDC"/>
+				</otherwise>
+			</choice>
+			<error-handler >
+				<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="1eb1fe04-f037-4783-af6f-ec0a53e1d465" type="EMP:EXISTS">
+					<ee:transform doc:name="Filter the emp already exists" doc:id="33fb0586-e260-4c1c-8bd1-8103f9f364d5">
+						
+						<ee:variables>
+							<ee:set-variable variableName="empExists"><![CDATA[%dw 2.0
+output application/json
+---
+vars.searchEmpRes filter ($.status == "failure")]]></ee:set-variable>
+
+						</ee:variables>
+					
+							
+					
+					</ee:transform>
+					<ee:transform doc:name="Removing the already existing empl" doc:id="2d483b8c-8e4d-4909-b514-cba6f1f2f29f">
+					<ee:variables>
+						<ee:set-variable variableName="searchEmpRes"><![CDATA[%dw 2.0
+output application/json
+---
+vars.searchEmpRes -- vars.empExists]]></ee:set-variable>
+</ee:variables>
+					</ee:transform>
+				</on-error-continue>
+			</error-handler>
+		
+</try>
+		<choice doc:name="Choice" doc:id="afa2d9d4-7784-4b81-83ab-cb83ed308324">
+				<when expression="#[vars.searchEmpRes != null and sizeOf(vars.searchEmpRes)&gt;0]">
+					<salesforce:upsert doc:name="Upsert" doc:id="56239b28-2ccc-433e-88cd-8a401c2b1e32" config-ref="SFDCDemoConnection" objectType="pocemployee__c" externalIdFieldName="email__c">
+				<salesforce:records><![CDATA[#[vars.searchEmpRes]]]></salesforce:records>
+			</salesforce:upsert>
+				</when>
+				<otherwise>
+					<logger level="INFO" doc:name="Logger" doc:id="489d2014-2b4c-4200-89df-1ec2876d7370" message="No New Emp to Add" />
+				</otherwise>
+			</choice>
+		<ee:transform doc:name="Rsponse transform" doc:id="bd5731a7-6f9e-4704-a262-d21f8830dd53">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+if (vars.searchEmpRes != null and sizeOf(vars.searchEmpRes)>0) payload else "No new employee to be added"]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="73b3c1e7-e005-4896-b1fe-ee342cf1ae19" message="End of add or update employee"/>
+		<error-handler ><on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="77a8e4f6-5624-40ae-acf1-eff0af9f9c82" type="ANY">
+				<ee:transform doc:name="Error Message" doc:id="70a8c24c-975f-4f78-bfaf-c6a03fcb50d9" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	status: "Failure",
+	errorMessage: error.description
+
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	
+</mule>

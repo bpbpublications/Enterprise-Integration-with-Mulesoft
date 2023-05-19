@@ -1,0 +1,10 @@
+[Route("users")]
+public class UserController : ApiController
+{
+    [HttpGet]
+    public IHttpActionResult GetUsers()
+    {
+        // Code to fetch list of users from database or other data source
+        return Ok(userList);
+    }
+}

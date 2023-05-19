@@ -1,0 +1,9 @@
+fetch('https://randomuser.me/api/', {
+  method: 'HEAD',
+})
+.then(response => {
+  console.log('Headers:', response.headers);
+})
+.catch(error => {
+  console.error('Error:', error);
+});

@@ -1,0 +1,11 @@
+const express = require('express');
+const app = express();
+
+app.get('/users', (req, res) => {
+    // Code to fetch list of users from database or other data source
+    res.send(userList);
+});
+
+app.listen(3000, () => {
+    console.log('Server listening on port 3000');
+});

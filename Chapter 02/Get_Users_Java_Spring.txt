@@ -1,0 +1,10 @@
+@RestController
+@RequestMapping("/")
+public class UserController {
+  
+  @GetMapping
+  public List<User> getUsers() {
+    // Code to fetch list of users from database or other data source
+    return userList;
+  }
+}

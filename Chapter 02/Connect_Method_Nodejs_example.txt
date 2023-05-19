@@ -1,0 +1,26 @@
+const https = require('https');
+
+const options = {
+  hostname: 'www.gaurav-arora.com',
+  port: 443,
+  method: 'CONNECT',
+};
+
+const req = https.request(options);
+
+req.on('connect', (res, socket) => {
+  socket.write('GET / HTTP/1.1\r\n' +
+               'Host: www.gaurav-arora.com:443\r\n' +
+               'Connection: close\r\n' +
+               '\r\n');
+
+  socket.on('data', (chunk) => {
+    console.log(chunk.toString());
+  });
+
+  socket.on('end', () => {
+    console.log('Request complete');
+  });
+});
+
+req.end();
